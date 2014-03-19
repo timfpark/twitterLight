@@ -83,19 +83,19 @@ TwitterAnalyzer.prototype.update = function(session, callback) {
     this.updateTweets(function() {
 
         var totalTimeMeasured = Math.floor((new Date() - self.earliestTweet) / 1000);
-        session.log.info('total time measured: ' + totalTimeMeasured);
+        session.log.debug('total time measured: ' + totalTimeMeasured);
 
         var totalCount = Object.keys(self.tweets).length;
-        session.log.info('total count: ' + totalCount);
+        session.log.debug('total count: ' + totalCount);
 
         var normalizedTotal = totalCount / totalTimeMeasured;
-        session.log.info('normalized total count (t/s):' + normalizedTotal);
+        session.log.debug('normalized total count (t/s):' + normalizedTotal);
 
         var measurementCount = self.countAfter(self.getMeasurementCutoff());
-        session.log.info('measurement period count: ' + measurementCount);
+        session.log.debug('measurement period count: ' + measurementCount);
 
         var normalizedMeasurement = measurementCount / self.measurementInterval;
-        session.log.info('normalized measurement count (t/s): ' + normalizedMeasurement);
+        session.log.debug('normalized measurement count (t/s): ' + normalizedMeasurement);
 
         var metric = normalizedMeasurement / normalizedTotal;
         session.log.info('metric: ' + metric);

@@ -10,6 +10,58 @@ var params;
 var twitter;
 var tweetAnalyzer;
 
+var computeHueFromMetric = function(metric) {
+    session.log.info('initial metric: ' + metric);
+
+    metric *= 2;
+
+    metric = Math.min(metric, 4.0);
+    metric = Math.max(metric, 0.0);
+    session.log.info('final metric: ' + metric);
+
+    return 46920 - 11730 * metric;
+};
+
+var update = function() {
+    tweetAnalyzer.update(session, function(metric) {
+
+        var hue = computeHueFromMetric(metric);
+        if (!lastHue) lastHue = hue;
+
+        session.log.info('final hue value of: ' + hue);
+
+        var hueStep = (hue - lastHue) / params.update_interval;
+        var tsStep = (params.update_interval * 1000) / RAMP_SIZE;
+
+        var now = new Date();
+        var messages = [];
+
+        for (var idx=1; idx <= params.update_interval; idx++) {
+
+          var commandTimestamp = new Date(now.getTime() + 1000 * (idx-1));
+          var cmd = new nitrogen.Message({
+                type: 'lightCommand',
+                ts: commandTimestamp,
+                to: params.light_id,
+                body: {
+                    on: true,
+                    bri: 255,
+                    hue: Math.floor(lastHue + hueStep * idx),
+                    sat: 255
+                }
+          });
+
+          messages.push(cmd);
+        }
+
+        Message.sendMany(session, function(err) {
+          if (err) return session.log.error('sending lightCommands failed: ' + err);
+        });
+
+        lastHue = hue;
+    });
+};
+
 var start = function(s, p) {
     session = s;
     params = p;
@@ -23,53 +75,22 @@ var start = function(s, p) {
     });
 
     twitter = new Twitter({
-        consumer_key: params.twitter_consumer_key, 
-        consumer_secret: params.twitter_consumer_secret,
-        access_token_key: params.twitter_access_token_key,
-        access_token_secret: params.twitter_access_token_secret, 
+        consumer_key:         params.twitter_consumer_key, 
+        consumer_secret:      params.twitter_consumer_secret,
+        access_token_key:     params.twitter_access_token_key,
+        access_token_secret:  params.twitter_access_token_secret, 
     });
 
     tweetAnalyzer = new TwitterAnalyzer({
-        twitter: twitter,
-        query: params.twitter_query,
+        twitter:              twitter,
+        query:                params.twitter_query,
         measurement_interval: params.measurement_interval,
-        average_interval: params.average_interval
+        average_interval:     params.average_interval
     });
 
-    fetchInterval = setInterval(function() {
-        tweetAnalyzer.update(session, function(metric) {
-            session.log.info('initial metric: ' + metric);
+    var lastHue;
 
-            metric *= 2;
-
-            metric = Math.min(metric, 4.0);
-            metric = Math.max(metric, 0.0);
-            session.log.info('final metric: ' + metric);
-
-            var hue = Math.floor(46920 - 11730 * metric);
-            session.log.info('sending hue value of: ' + hue);
-
-            new nitrogen.Message({
-                  type: '_twitterMetric',
-                  body: {
-                      query: tweetAnalyzer.query,
-                      metric: metric
-                  }
-            }).send(session);
-
-            new nitrogen.Message({
-                  type: 'lightCommand',
-                  to: params.light_id,
-                  body: {
-                      on: true,
-                      bri: 255,
-                      hue: hue,
-                      sat: 255
-                  }
-            }).send(session);
-        });
-
-    }, params.update_interval * 1000);
+    fetchInterval = setInterval(update, params.update_interval * 1000);
 };
 
 var stop = function() {
