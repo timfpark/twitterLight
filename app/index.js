@@ -3,6 +3,7 @@ var nitrogen = require('nitrogen')
   , TwitterAnalyzer = require('./twitterAnalyzer');
 
 var fetchInterval;
+var lastHue;
 
 var session;
 var params;
@@ -30,31 +31,36 @@ var update = function() {
 
         session.log.info('final hue value of: ' + hue);
 
-        var hueStep = (hue - lastHue) / params.update_interval;
-        var tsStep = (params.update_interval * 1000) / RAMP_SIZE;
+        var STEPS = 4;
+
+        var hueStep = (hue - lastHue) / STEPS;
+        var tsStep = (params.update_interval * 1000) / STEPS;
 
         var now = new Date();
         var messages = [];
 
-        for (var idx=1; idx <= params.update_interval; idx++) {
+        for (var idx=1; idx <= STEPS; idx++) {
 
-          var commandTimestamp = new Date(now.getTime() + 1000 * (idx-1));
+          var executeAt = new Date(now.getTime() + tsStep * (idx-1));
+          var expiresAt = new Date(executeAt.getTime() + 15 * 60 * 1000);
+
           var cmd = new nitrogen.Message({
                 type: 'lightCommand',
-                ts: commandTimestamp,
-                to: params.light_id,
+                ts:   executeAt,
+                to:   params.light_id,
                 body: {
                     on: true,
                     bri: 255,
                     hue: Math.floor(lastHue + hueStep * idx),
                     sat: 255
-                }
+                },
+                expires: expiresAt
           });
 
           messages.push(cmd);
         }
 
-        Message.sendMany(session, function(err) {
+        nitrogen.Message.sendMany(session, messages, function(err) {
           if (err) return session.log.error('sending lightCommands failed: ' + err);
         });
 
@@ -88,8 +94,7 @@ var start = function(s, p) {
         average_interval:     params.average_interval
     });
 
-    var lastHue;
-
+    update();
     fetchInterval = setInterval(update, params.update_interval * 1000);
 };
 
