@@ -2,107 +2,77 @@ var nitrogen = require('nitrogen')
   , Twitter = require('twitter')
   , TwitterAnalyzer = require('./twitterAnalyzer');
 
-var fetchInterval;
-var lastHue;
+function TwitterLightApp(session, params) {
+    this.session = session;
+    this.params = params;
+}
 
-var session;
-var params;
-
-var twitter;
-var tweetAnalyzer;
-
-var computeHueFromMetric = function(metric) {
-    session.log.info('initial metric: ' + metric);
+TwitterLightApp.prototype.computeHueFromMetric = function(metric) {
+    this.session.log.info('initial metric: ' + metric);
 
     metric *= 2;
 
     metric = Math.min(metric, 4.0);
     metric = Math.max(metric, 0.0);
-    session.log.info('final metric: ' + metric);
+    this.session.log.info('final metric: ' + metric);
 
     return 46920 - 11730 * metric;
 };
 
-var update = function() {
-    tweetAnalyzer.update(session, function(metric) {
+TwitterLightApp.prototype.update = function() {
+    var self = this;
 
-        var hue = computeHueFromMetric(metric);
-        if (!lastHue) lastHue = hue;
+    tweetAnalyzer.update(this.session, function(metric) {
 
-        session.log.info('final hue value of: ' + hue);
+        var hue = self.computeHueFromMetric(metric);
 
-        var STEPS = 4;
+        self.session.log.info('final hue value of: ' + hue);
 
-        var hueStep = (hue - lastHue) / STEPS;
-        var tsStep = (params.update_interval * 1000) / STEPS;
-
-        var now = new Date();
-        var messages = [];
-
-        for (var idx=1; idx <= STEPS; idx++) {
-
-          var executeAt = new Date(now.getTime() + tsStep * (idx-1));
-          var expiresAt = new Date(executeAt.getTime() + 15 * 60 * 1000);
-
-          var cmd = new nitrogen.Message({
-                type: 'lightCommand',
-                ts:   executeAt,
-                to:   params.light_id,
-                body: {
-                    on: true,
-                    bri: 255,
-                    hue: Math.floor(lastHue + hueStep * idx),
-                    sat: 255
-                },
-                expires: expiresAt
-          });
-
-          messages.push(cmd);
-        }
-
-        nitrogen.Message.sendMany(session, messages, function(err) {
-          if (err) return session.log.error('sending lightCommands failed: ' + err);
-        });
-
-        lastHue = hue;
+        new nitrogen.Message({
+            type: 'lightCommand',
+            to: self.params.light_id,
+            tags: [ nitrogen.CommandManager.commandTag(self.session) ],
+            body: {
+              on: true,
+              bri: 255,
+              hue: hue,
+              sat: 255
+            }
+        }).send(self.session);
     });
 };
 
-var start = function(s, p) {
-    session = s;
-    params = p;
+TwitterLightApp.prototype.start = function() {
+    var self = this;
 
     ['twitter_consumer_key', 'twitter_consumer_secret', 'twitter_access_token_key', 'twitter_access_token_secret',
      'light_id', 'twitter_query', 'measurement_interval', 'average_interval', 'update_interval'].forEach(function(key) {
-        if (!params[key]) {
-            session.log.error('required parameter ' + key +' not supplied.');
-            return process.exit(0);            
+        if (!self.params[key]) {
+            self.session.log.error('required parameter ' + key +' not supplied.');
+            return process.exit(0);
         }
     });
 
     twitter = new Twitter({
-        consumer_key:         params.twitter_consumer_key, 
-        consumer_secret:      params.twitter_consumer_secret,
-        access_token_key:     params.twitter_access_token_key,
-        access_token_secret:  params.twitter_access_token_secret, 
+        consumer_key:         this.params.twitter_consumer_key,
+        consumer_secret:      this.params.twitter_consumer_secret,
+        access_token_key:     this.params.twitter_access_token_key,
+        access_token_secret:  this.params.twitter_access_token_secret,
     });
 
     tweetAnalyzer = new TwitterAnalyzer({
         twitter:              twitter,
-        query:                params.twitter_query,
-        measurement_interval: params.measurement_interval,
-        average_interval:     params.average_interval
+        query:                this.params.twitter_query,
+        measurement_interval: this.params.measurement_interval,
+        average_interval:     this.params.average_interval
     });
 
-    update();
-    fetchInterval = setInterval(update, params.update_interval * 1000);
+    this.update();
+    this.fetchInterval = setInterval(function() { self.update(); }, this.params.update_interval * 1000);
 };
 
-var stop = function() {
-    clearInterval(fetchInterval);
+TwitterLightApp.prototype.stop = function() {
+    clearInterval(this.fetchInterval);
 };
 
-module.exports = {
-    start: start,
-    stop: stop
-};
+module.exports = TwitterLightApp;

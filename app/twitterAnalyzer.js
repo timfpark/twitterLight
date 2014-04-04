@@ -6,7 +6,7 @@ function TwitterAnalyzer(config) {
 
     this.tweets = {};
     this.earliestTweet = null;
-} 
+}
 
 TwitterAnalyzer.dateSecondsFromNow = function(seconds) {
     return new Date(new Date().getTime() + seconds * 1000);
@@ -29,6 +29,7 @@ TwitterAnalyzer.prototype.updateTweets = function(callback) {
             return callback();
         }
 
+        console.log('number of tweets: ' + Object.keys(self.tweets).length);
         results.statuses.forEach(function(tweet) {
             var simplifiedTweet = {
                 created_at: new Date(Date.parse(tweet.created_at)),
@@ -37,12 +38,14 @@ TwitterAnalyzer.prototype.updateTweets = function(callback) {
             };
 
             if (!self.tweets[tweet.id_str]) {
-                self.tweets[tweet.id_str] = simplifiedTweet;                
+                self.tweets[tweet.id_str] = simplifiedTweet;
                 console.log('adding tweet: ' + JSON.stringify(simplifiedTweet));
             }
         });
 
         self.trimBefore(self.getAverageCutoff());
+
+        console.log('final tweets: ' + JSON.stringify(self.tweets));
 
         return callback();
     });
@@ -51,14 +54,14 @@ TwitterAnalyzer.prototype.updateTweets = function(callback) {
 TwitterAnalyzer.prototype.trimBefore = function(date) {
     var trimmed = {};
     this.earliestTweet = new Date();
-    
+
     for (var id in this.tweets) {
         var tweet = this.tweets[id];
         if (tweet.created_at >= date) {
             trimmed[tweet.id_str] = tweet;
             if (tweet.created_at < this.earliestTweet) {
                 this.earliestTweet = tweet.created_at;
-            }            
+            }
         }
     }
 
@@ -100,7 +103,7 @@ TwitterAnalyzer.prototype.update = function(session, callback) {
         var metric = normalizedMeasurement / normalizedTotal;
         session.log.info('metric: ' + metric);
 
-        return callback(metric); 
+        return callback(metric);
     });
 };
 
