@@ -88,6 +88,8 @@ TwitterAnalyzer.prototype.update = function(session, callback) {
         var totalTimeMeasured = Math.floor((new Date() - self.earliestTweet) / 1000);
         session.log.debug('total time measured: ' + totalTimeMeasured);
 
+        totalTimeMeasured = Math.max(1.0, totalTimeMeasured);
+
         var totalCount = Object.keys(self.tweets).length;
         session.log.debug('total count: ' + totalCount);
 
@@ -100,7 +102,12 @@ TwitterAnalyzer.prototype.update = function(session, callback) {
         var normalizedMeasurement = measurementCount / self.measurementInterval;
         session.log.debug('normalized measurement count (t/s): ' + normalizedMeasurement);
 
-        var metric = normalizedMeasurement / normalizedTotal;
+        var metric;
+        if (totalCount !== 0 && self.measurementInterval !== 0)
+            metric = (measurementCount / totalCount) * (self.averageInterval / self.measurementInterval);
+        else
+            metric = 0.0;
+
         session.log.info('metric: ' + metric);
 
         return callback(metric);

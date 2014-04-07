@@ -16,7 +16,7 @@ TwitterLightApp.prototype.computeHueFromMetric = function(metric) {
     metric = Math.max(metric, 0.0);
     this.session.log.info('final metric: ' + metric);
 
-    return 46920 - 11730 * metric;
+    return Math.floor(46920 - 11730 * metric);
 };
 
 TwitterLightApp.prototype.update = function() {
@@ -45,8 +45,15 @@ TwitterLightApp.prototype.update = function() {
 TwitterLightApp.prototype.start = function() {
     var self = this;
 
-    ['twitter_consumer_key', 'twitter_consumer_secret', 'twitter_access_token_key', 'twitter_access_token_secret',
-     'light_id', 'twitter_query', 'measurement_interval', 'average_interval', 'update_interval'].forEach(function(key) {
+    ['twitter_consumer_key',
+     'twitter_consumer_secret',
+     'twitter_access_token_key',
+     'twitter_access_token_secret',
+     'light_id',
+     'twitter_query',
+     'measurement_interval',
+     'average_interval',
+     'update_interval'].forEach(function(key) {
         if (!self.params[key]) {
             self.session.log.error('required parameter ' + key +' not supplied.');
             return process.exit(0);
